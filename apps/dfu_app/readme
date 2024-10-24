@@ -1,0 +1,194 @@
+# BlueZ HCI DFU Application User Guide (v0.1)
+
+## Revision History
+
+| Revision | Date       | Comments                                                                                                                                                                                                                               |
+| -------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| v0.1     | 2024-05-28 | Initiate this document                                                                                                                                                                                                                 |
+
+## 1. Introduction
+
+The purpose of this document is to introduce the user guide for the BlueZ HCI DFU Application, which upgrades the firmware of the RN HCI device.
+This note is mainly targeted at an audience that wants to execute the BlueZ HCI DFU Application on the SAMA7 EVK.
+
+## 2. Project Setup
+Refer to "[*BlueZ BLE SW Application Developer Guide*](../../developer_guide.md)".
+
+## 3. Build Environment
+Refer to "[*BlueZ BLE SW Application Developer Guide*](../../developer_guide.md)".
+
+## 4. Software Development
+### 4.1 Software Architecture <br>
+ ![dfu-architecture](assets/dfu-architecture.png)
+ - App_cmd : Command parser, Command shell utilizes BlueZ (based on readline library).
+ - App_hci_dfu : HCI DFU flow process includes the OTAU file parsing.
+ - App_hci_vnd :Send HCI vendor command and receive response.
+### 4.2 DFU Feature
+#### 4.2.1 DFU procedure design <br>
+  ![dfu-procedure](assets/dfu-procedure.png)
+
+## 5. Environment Setup
+### 5.1 Hardware Setting 
+ - Description of SAMA7-EK Board. Note that there are label A, B, C, D noted on the diagram. <br>
+    ![SAMA7-EK-board-desc](assets/SAMA7-EK-board-desc.png)
+    - (Label A) USB port (Micro-AB) for power supply.
+    - (Label B) USB (Type-A) thumb drive with ble-uart-bluez application and its pattern files.
+    - (Label C) demo image SD card. 
+    - (Label D) USB port (Micro-AB) for console terminal, the other side should be connected to PC.
+    - Note: If you use DUT without mikroBUS interface, please cross wire of DUT's Tx, Rx and GND with SAMA7 board.
+    > Default Jumper Settings:
+    >   - Open: J3, J22, J25, J26
+    >   - Close: J2
+
+ - Plug RNBD451 Add On Board into mikroBUS#1<br>
+    ![attach-to-mikrobus](assets/attach-to-mikrobus.jpg)
+ - PWR_SEL jumper please switch to mikroBUS<br>
+    ![pwr-select](assets/pwr-select.jpg)
+ 
+### 5.2 Prepare to Bring Up SAMA7 EVK
+ - make a bootable SD Card demo image by reference this page [Sama7g5EKMainPage](https://www.linux4sam.org/bin/view/Linux4SAM/Sama7g5EKMainPage).
+    - Refer to "Create a SD card with the demo" chapter then download and install Etcher.
+      ![SAMA7-EVK-demo-archive](assets/SAMA7-EVK-demo-archive.png)
+    - insert the SD card into (Label C).
+ 
+### 5.3 Prepare BlueZ HCI DFU Application (dfu-bluez)
+ 1. cross-compile application
+ 2. copy dfu-bluez into a USB thumb drive.
+ 3. plug the thumb drive into (Label B)
+ 
+### 5.4 Attach RNBD451 HCI controller to SAMA7 EVK
+ > Note that '#' in following instructions are stand for Linux prompt in SamA7, you don't need to input '#'. Besides, we take an example of RN HCI device is probed by Linux in /dev/ttyS1.
+ 1. Plug USB cord into (Label A) and (Label D).
+ 2. Power up SAMA7 by pressing nStart button.
+ 3. Open COM port of (Label D)
+     - Find "JLINK CDC UART Port" in Device Manager to identify which COM port used.
+     - If no new COM port found, follow "Using DEBUG on TTL-to-USB connector (DEBUG J20)" part on Sama7g5EKMainPage.
+ 4. Login as root when login prompt shows.
+ 5. Copy BlueZ configuration file "main.conf"
+     - main.conf can be found in /tools in this repo. You need to place it on USB thumb drive and mount the USB thumb drive then copy it to Linux system specific folder.
+     - ```#cp main.conf /etc/bluetooth```
+ 6. Configure baud rate for ttyS1
+     - ```#stty -F /dev/ttyS1 115200```
+     - You will see following messages shown, it is as expected. <br>
+      ```
+      atmel_usart_serial atmel_usart_serial.1.auto: using dma1chan2 for rx DMA transfers
+      atmel_usart_serial atmel_usart_serial.1.auto: using dma1chan3 for tx DMA transfers
+     ```
+ 7. Attach HCI device into Linux.
+     - ```#hciattach /dev/ttyS1 any 115200 noflow```
+     - Once following messages show, the hciattach is successful.<br>
+       ```
+       root@sama7g5ek-sd:~# Bluetooth: MGMT ver 1.22
+       NET: Registered PF_ALG protocol family
+       ```
+        
+### 5.5 Execute dfu-bluez Application
+   1. Mount the USB thumb drive.
+   ```
+   #mount /dev/sda1 /mnt
+   cd /mnt
+   ```
+   2. Execute dfu-bluez
+   ```
+   #sudo hciconfig hci0 up
+   #sudo ./dfu-bluez
+   ```
+
+## 6. dfu-bluez Application Command Sets
+### 6.1 Main Menu
+ - type "help" command to display main menu
+```
+[DFU-App]# help
+Menu main:
+Available commands:
+-------------------
+dfu ...                                           DFU process, usage: dfu <file_name> [d] uart device [b] baud rate. e.g. dfu RNBD451_1.1.0.17.OTA.bin d /dev/ttyS1 b 115200
+aver ...                                          Query HCI controller application version, usage: aver [d] uart device [b] baud rate. e.g. aver d /dev/ttyS1 b 115200
+version                                           Display version
+quit                                              Quit program
+exit                                              Quit program
+help                                              Display help about this program
+export                                            Print environment variables
+[DFU-App]# 
+```
+
+### 6.2 Commands Usage
+ - dfu ...
+    - Initiate a DFU process. Usage: dfu <otau_file> , for example, `dfu RNBD451_1.1.0.17.OTA.bin`
+    - <otau_file> is for ota image file name, following the command 'dfu'.
+ - aver
+    - Show controller application version. Users can use this command to issue a vendor HCI command to inquire about the HCI application version. This is useful for confirming whether the DFU was successful.<br>
+    Following example shows HCI application version is 1.1.0.17.
+    ```
+    [DFU-App]# aver
+    HCI app version=1.1.0.17
+    [DFU-App]# 
+    ```
+ - version
+    - Show dfu-bluez version (host application)
+### 6.3 DFU Procedure
+ - In following example, `Tx(254/R:369490/T:369744)` stands for 254 bytes has been transmitted, 369490 bytes are remaining and total 369744 bytes in OTAU need to be sent.
+ - Final validation result is print out when all OTAU data has been sent, controller will reboot automatically if DFU validation is successful. 
+ - Please attach controller again. Power cycle is suggested.
+```
+[DFU-App]# dfu RNBD451_1.1.0.17.OTA.bin
+[DFU-App]# Tx(254/R:369490/T:369744)
+Tx(254/R:369236/T:369744)
+Tx(254/R:368982/T:369744)
+Tx(254/R:368728/T:369744)
+...
+Tx(254/R:936/T:369744)
+Tx(254/R:682/T:369744)
+Tx(254/R:428/T:369744)
+Tx(254/R:174/T:369744)
+Tx(174/R:0/T:369744)
+Validation result=Validation Success
+Exited with status=DFU exited with controller reboot
+Time elapsed: 39.052957 seconds
+[DFU-App]# 
+```
+
+## 7. DFU Exception for RNBD350
+After RNBD350 enters DFU mode, the existing image is no longer valid and the system will only support commands related to the DFU process. The device remains in DFU mode until a new firmware image is successfully installed. Consequently, if the DFU process is not completed successfully, the 'hciattach' command will no longer function. To address this particular issue, there are new arguments supported to facilitate firmware upgrades through a serial device directly.
+### 7.1 dfu Command
+ - Usage: dfu <otau_file> d /dev/ttySx b <baud_rate>, for example, `dfu RNBD350_1.0.0.7.OTA.bin d /dev/ttyS1 b 115200`
+ - Additional arguments:
+   - 'd' followed by /dev/ttySx serial port name in the Linux device tree.
+   - 'b' followed by baud rate setting. Note that in the sample application, only 115200 and 921600 are supported.     
+### 7.2 aver Command
+ - Usage: aver d /dev/ttySx b <baud_rate>, for example, `aver d /dev/ttyS1 b 115200`
+ - Additional arguments:
+   - 'd' followed by /dev/ttySx serial port name in the Linux device tree.
+   - 'b' followed by baud rate setting. Note that in the sample application, only 115200 and 921600 are supported.     
+
+## 8. DFU Performance
+OTAU image size = 362KB
+
+| Baud Rate | Elapsed Time |
+|-----------|--------------|
+| 115200    | 40.65s       |
+| 921600    | 9.98s        |
+
+## 9. Reference
+
+ - GLib Reference Manual
+https://developer-old.gnome.org/glib/unstable/
+
+ - GNU Readline Library
+http://www.gnu.org/software/readline/
+
+ - BlueZ
+https://www.bluez.org/
+
+## 10. Note for Debugging
+When performing a test case, please add following special steps. These steps will adjust system time and generate a useful HCI log to assist with debugging if needed.
+1. Configure date information in system. Please configure system time whenever you power on the SAMA7 EVK.
+```
+date -s "2024/4/11 16:36:00"
+```
+2. The "exec-ble-uart-bluez.sh" script can be found in /tools in this repo and it replace step 5.4.6 and step 5.4.7 describe aboved. Execute "exec-ble-uart-bluez.sh". Followed the script name by baud rate, if baud rate is not specified, it would be set to 115200 automatically.
+```
+#mount /dev/sda1 /mnt
+#cd /mnt
+#./exec-dfu-bluez.sh 115200
+```

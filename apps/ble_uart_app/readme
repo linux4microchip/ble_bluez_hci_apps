@@ -1,0 +1,683 @@
+# BlueZ BLE UART Application User Guide (v1.0)
+
+## Revision History
+
+| Revision | Date       | Comments                                                                                                                                                                                                                               |
+| -------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| v0.1     | 2024-05-28 | Initiate this document                                                                                                                                                                                                                 |
+| v1.0     | 2024-09-27 | Formal release                                                                                                                                                                                                                         |
+
+## 1. Introduction
+
+The purpose of this document is to intruduce the user guide of the BlueZ BLE UART Application.
+This note is mainly target to audience that want to execute BlueZ BLE UART Application on SAMA7 EVK.
+
+## 2. Project Setup
+Refer to "[*BlueZ BLE SW Application Developer Guide*](../../developer_guide.md)".
+
+## 3. Build Environment
+Refer to "[*BlueZ BLE SW Application Developer Guide*](../../developer_guide.md)".
+
+## 4. Software Development
+### 4.1 Software Architecture <br>
+ ![ble-uart-bluez-architecture](assets/ble-uart-bluez-architecture.png)
+ - App_cmd : Command parser, Command shell utilizes BlueZ (based on readline library).
+ - App_dbp : BlueZ D-Bus Proxy handler.
+ - App_scan : BlueZ D-Bus Adapter API wrapper.
+ - App_timer : Wrap GNU Glib timeout related function.
+ - App_trpc : Functions for TRP client role.
+ - App_trps : Functions for TRP server role.
+ - App_adv : BlueZ mgmt API used.
+ - App_mgmt : BlueZ mgmt API wrapper, set/get local name, set ext adv parameters, set ext adv data, set/get PHY support.
+ - Pairing Agent : Provide pairing related function/interaction to aid pair.
+ - Ble_trsps : BLE Transparent Profile Server role.
+ - Ble_trspc : BLE Transparent Profile Client role.
+    
+### 4.2 Central Feature
+#### 4.2.1 Scan function design <br>
+ ![scan](assets/scan.png)
+#### 4.2.2 Create connection function design <br>
+ ![create-connection](assets/create-connection.png)
+#### 4.2.3 Data transmission function design <br>
+ ![data-transmission-central](assets/data-transmission-central.png)
+    
+### 4.3 Peripheral Feature
+#### 4.3.1 Advertising function design <br>
+ ![advertising](assets/advertising.png)
+#### 4.3.2 Connection handler function design <br>
+ ![connection-handler](assets/connection-handler.png)
+#### 4.3.3 Data transmission function design <br>
+ ![data-transmission-peripheral](assets/data-transmission-peripheral.png)
+## 5. Environment Setup
+### 5.1 Hardware Setting 
+ - Description of SAMA7-EK Board. Note that there are label A, B, C, D noted on the diagram.  
+    ![SAMA7-EK-board-desc](assets/SAMA7-EK-board-desc.png)
+     - (Label A) USB port (Micro-AB) for power supply.
+     - (Label B) USB (Type-A) thumb drive with ble-uart-bluez application and its pattern files.
+     - (Label C) demo image SD card. 
+     - (Label D) USB port (Micro-AB) for console terminal, the other side should be connected to PC.
+     - Note: If you use DUT without mikroBUS interface, please cross wire of DUT's Tx, Rx and GND with SAMA7 board.
+        > Default Jumper Settings:
+        >   - Open: J3, J22, J25, J26
+        >   - Close: J2
+
+ - Plug RNBD451 Add On Board into mikroBUS#1<br>
+ ![attach-to-mikrobus](assets/attach-to-mikrobus.jpg)
+ - PWR_SEL jumper please switch to mikroBUS<br>
+ ![pwr-select](assets/pwr-select.jpg)
+ 
+### 5.2 Prepare to Bring Up SAMA7 EVK
+ - make a bootable SD Card demo image by reference this page [Sama7g5EKMainPage](https://www.linux4sam.org/bin/view/Linux4SAM/Sama7g5EKMainPage).
+    - Refer to "Create a SD card with the demo" chapter then download and install Etcher.
+    ![SAMA7-EVK-demo-archive](assets/SAMA7-EVK-demo-archive.png)
+    - insert the SD card into (Label C).
+ 
+### 5.3 Prepare BLE UART BLueZ Application (ble-uart-bluez)
+ 1. cross-compile application
+ 2. copy ble-uart-bluez into a USB thumb drive.
+ 3. plug the thumb drive into (Label B)
+ 
+### 5.4 Attach RNBD451 HCI controller to SAMA7 EVK
+ > Note that '#' in following instructions are stand for Linux prompt in SamA7, you don't need to input '#'.
+1. Plug USB cord into (Label A) and (Label D).
+2. Power up SAMA7 by pressing nStart button.
+3. Open COM port of (Label D)
+    - Find "JLINK CDC UART Port" in Device Manager to identify which COM port used.
+    - If no new COM port found, follow "Using DEBUG on TTL-to-USB connector (DEBUG J20)" part on Sama7g5EKMainPage.
+4. Login as root when login prompt shows.
+5. Copy BlueZ configuration file "[*main.conf*](../../tools/main.conf)"
+    - "[*main.conf*](../../tools/main.conf)" can be found in /tools in this repo. You need to place it on USB thumb drive and mount the USB thumb drive then copy it to Linux system specific folder.
+    - ```
+      #cp main.conf /etc/bluetooth
+      ```
+6. Configure baud rate for ttyS1
+    - ```#stty -F /dev/ttyS1 115200```
+    - You will see following messages shown, it is as expected. <br>
+        ```
+        atmel_usart_serial atmel_usart_serial.1.auto: using dma1chan2 for rx DMA transfers
+        atmel_usart_serial atmel_usart_serial.1.auto: using dma1chan3 for tx DMA transfers
+        ```
+7. Attach HCI device into Linux.
+    - ```#hciattach /dev/ttyS1 any 115200 noflow```
+    - Once following messages show, the hciattach is successful.<br>
+        ```
+        root@sama7g5ek-sd:~# Bluetooth: MGMT ver 1.22
+        NET: Registered PF_ALG protocol family
+        ```
+### 5.5 Execute ble-uart-bluez Application
+ > Note that '#' in following instructions are stand for Linux prompt in SamA7, you don't need to input '#'.
+ 
+ > Note that, in order to have a better user experience, please change terminal newline check to only "LF" (Line Feed).
+
+1. Mount the USB thumb drive.
+    ```
+    #mount /dev/sda1 /mnt
+    cd /mnt
+    ```
+3. Execute ble-uart-bluez
+    ```
+    #sudo ./ble-uart-bluez
+    ```
+
+## 6. ble-uart-bluez Application Command Sets
+### 6.1 Main Menu
+Type "help" command to display main menu.
+```
+[BLE UART]# help
+Menu main:
+Available commands:
+-------------------
+scan [...]                                        Scan devices. usage: scan [r <rssi>][s <uuid>][p <pattern>][u <128bit uuid>][m <manufactor id><data>]
+dev                                               List available devices, inlude cached devices
+remove <index>                                    Remove devices, inlude cached devices
+conn <index>                                      Connect to selected device which listed in dev command
+cc <index>                                        Cancel connect command
+disc <index>                                      Disconnect to selected device which listed in dev command
+adv <0-1>                                         Advertisement switch
+raw ...                                           Send raw data to remote peer manually. usage: raw <index> <text>
+txf ...                                           Send file to remote peer. usage: txf <index> <file-path>
+rxf ...                                           Receive file from remote peer. usage: rxf <index> [file-path]
+sw <1-3>                                          Transmission mode switch (1=checksum, 2=loopback, 3=fixed-pattern)
+pt <0-6>                                          Select data pattern for transmission(0=1K, 1=5K, 2=10K, 3=50K, 4=100K, 5=200L, 6=500K)
+b <index>                                         Start Burst Mode data transmission on selected device
+ba                                                Start Burst Mode data transmission on all devices
+pair <index>                                      Pair with selected device
+unpair <index>                                    Unpair with selected device
+io <0-4>                                          IO capability setting (0=DispalyOnly, 1=DisplayYesNo, 2=KeyboardOnly, 3=NoInputNoOutput, 4=KeyboardDisplay)
+sc <0-1>                                          Secure connection setting(0=disable, 1=enable)
+pinfo                                             Print current IO capability and secure connection setting
+version                                           Display version
+quit                                              Quit program
+exit                                              Quit program
+help                                              Display help about this program
+export                                            Print environment variables
+[BLE UART]# 
+```
+
+### 6.2 Commands Usage
+ - scan [ ... ]
+    - When the scan command is used, DUT acts as a Central device and starts BLE scanning. After 5 seconds of discovery, the list of available devices will be printed.
+    - There are several optional scan filter parameters.
+        - r: RSSI threshold value, devices with advertising RSSI larger than specify value will be reported.
+        - s: service data UUID, for example, input "feda" service UUID for MCHP BLE devices.
+        - p: pattern including BDA or Device name. Devices where the pattern matches either the prefix of the address or device name will be reported.
+        - u: Filter by service UUIDs, 128 bits format example: 0000xxxx-0000-1000-8000-00805f9b34fb
+        - m: ManufacturerData, parameters includes id and data. Manufacturer specific advertisement data. Keys are 16 bits Manufacturer ID followed by its byte array value.
+    ```
+    [BLE UART]# scan
+    Discovery started
+    found device[53:64:6F:37:C9:2E][random]
+    found device[5E:FF:85:EE:44:A2][random]
+    found device[77:20:D1:1F:CB:B4][random]
+    found device[4F:BC:9A:CE:6F:73][random]
+    found device[44:13:D9:4C:EA:F3][random]
+    found device[5F:1B:E5:B2:B6:B1][random]
+    found device[FC:0F:E7:80:17:1B][public]
+    found device[7C:98:19:F5:C2:73][random]
+    found device[5C:70:32:E4:52:B0][random]
+    found device[7E:9B:6B:04:83:9A][random]
+    ...
+    Discovery stopped
+    [BLE UART]#
+
+    Total devices scanned=74, only list devices which RSSI > -70
+    Device List:
+    [Index]	[Connected:?   ][     Address     ][RSSI][Name]
+    =================================================================================
+    dev# 0	[connected:0(N)][5E:FF:85:EE:44:A2][ -55]
+    dev# 1	[connected:0(N)][77:20:D1:1F:CB:B4][ -55]
+    dev# 2	[connected:0(N)][53:64:6F:37:C9:2E][ -55][BLEPeripheralApp]
+    dev# 3	[connected:0(N)][4F:BC:9A:CE:6F:73][ -57]
+    dev# 4	[connected:0(N)][44:13:D9:4C:EA:F3][ -57]
+    dev# 5	[connected:0(N)][FC:0F:E7:80:17:1B][ -58][RNBD451_171B]
+    dev# 6	[connected:0(N)][5F:1B:E5:B2:B6:B1][ -61][BLE_UART_8245]
+    [BLE UART]# 
+    ```
+
+
+ - dev
+    - Display the list of devices that are cached in storage or reported from a scan.
+    - Note that when the device is reported from a scan, BlueZ Host will remove the device if it was unseen again for certain period; the default is 30 seconds.<br>
+      This could be cnanged from TemporaryTimeout configuration item in main.conf.
+    ```
+    [BLE UART]# dev
+
+    Total devices scanned=1, only list devices which RSSI > -70
+    Device List:
+    [Index]	[Connected:?   ][     Address     ][RSSI][Name]
+    =================================================================================
+    dev# 0	[connected:1(P)][34:81:F4:AE:0E:B1][   0][RNBD451_0EB1]
+    [BLE UART]# 
+    ```
+
+ - remove \<index\>
+    - remove device from available list according to device index.
+    ```
+    [BLE UART]# remove 0
+    remove device[34:81:F4:AE:0E:B1]
+    [BLE UART]# disconnect reason=2
+    device [34:81:F4:AE:0E:B1] disconnected
+    [BLE UART]# 
+    ```
+ - conn \<index\>
+    - connect to device from available list according to device index.
+    ```
+    [BLE UART]# conn 0
+    connecting to device[34:81:F4:AE:0E:B1]
+    ```
+ - cc \<index\>
+    - cancel a preceding connection before a reply to it has been received.
+    ```
+    [BLE UART]# conn 0
+    connecting to device[34:81:F4:AE:0E:B1]
+    [BLE UART]# cc 0
+    disconnecting to device[34:81:F4:AE:0E:B1]
+    Failed to connect[34:81:F4:AE:0E:B1]: org.bluez.Error.Failed
+    [BLE UART]# 
+    ```
+ - disc \<index\>
+    - disconnect to device from available list according to device index.
+    ```
+    [BLE UART]# disc 0
+    disconnecting to device[34:81:F4:AE:0E:B1]
+    [BLE UART]# disconnect reason=2
+    device [34:81:F4:AE:0E:B1] disconnected
+    [BLE UART]# 
+    ```
+ - adv \<0-1\>
+    - start or stop an undirected connectable advertisement.
+    - advertising device name will be shown after command executed.
+    
+    | option value | advertising state |
+    | :--:|:--|
+    | 1  | start advertising |
+    | 0  | stop advertising |
+    ```
+    [BLE UART]# adv 1
+    advertising name=BLUEZ_156F
+    advertising is on
+    [BLE UART]# 
+    ```
+ - pair \<index\>
+    - pair with selected device
+    - The pair agent prompt user input according to IO capability setting.
+        - Example of IO capability is configured to 0 (NoInputNoOutput)
+        ```
+        [BLE UART]# pair 0
+        pair device [34:81:F4:AE:0E:B1]
+        device paired
+        [BLE UART]# 
+        ```
+        - Example of IO capability is configured to 4 (KeyboardDisplay)
+        ```
+        [BLE UART]# conn 0
+        connecting to device[34:81:F4:AE:0E:B1]
+        device [34:81:F4:AE:0E:B1] connected
+        Request confirmation
+        [agent] Confirm passkey 538421 (yes/no): yes
+        device paired
+        TRP down link is established
+        TRP up link is established
+        [BLE UART]# 
+        ```
+ - unpair \<index\>
+    - unpair device according to device index. The link will be disconnected and the record in device list will be removed as well.
+    ```
+    [BLE UART]# unpair 0
+    device [28:E1:4C:D8:54:5C]type=1 unpairing
+    remove bonding success
+    [BLE UART]# disconnect reason=2
+    device [28:E1:4C:D8:54:5C] disconnected
+    [BLE UART]# 
+    ```
+ - raw ...
+    - Send data to remote peer manually using raw command, we name the operation Text Mode. The first parameter is device index, the second parameter is raw data.
+    - Peripheral role example:
+    ```
+    [BLE UART]# raw 0 hello-from-bluez
+    <Text Mode> Notify(16 bytes) to all clients successed
+    <Text Mode> Received(11 bytes) from[34:81:F4:AE:0E:B1]:hello-hello
+    [BLE UART]# 
+    ```
+ - txf ...
+    - Send file from file-path to remote peer according to device index. usage: txf \<index\> <file-path>
+    - example : txf 0 ./pattern/100k.txt
+    ```
+    [BLE UART]# txf 0 ./pattern/100k.txt
+    set work mode = raw mode
+    Sending data to remote peer.
+    <Text Mode> Sent(100008 bytes) to peer[34:81:F4:AE:0E:B1] successed
+    [BLE UART]# 
+    ```
+ - rxf ...
+    - Receive file and save to file-path from remote peer. usage: rxf \<index\> [file-path] 
+    - There are two usages which are different based on whether the 'file-path' arguments is included or not. To receive a raw file and save it to a local file, please use include 'file-path'. Alternatively, if you want to compare the received raw data file with a built-in pattern file, please use exclude 'file-path'.
+    - Example of receiving a raw file and save it to a local file.
+    ```
+    [BLE UART]# rxf 0 rcv-100k.txt
+    set work mode = raw mode
+    waiting for data sending from remote peer.
+
+    Raw Data Rx finished
+    <Text Mode> Received(100008 bytes) from[34:81:F4:AE:0E:B1].
+    No comparison due to no pattern selected.
+    [BLE UART]# 
+    ```
+    - To compare the received file with pattern file, you must use 'pt' command to select a pattern file first. After the transmission is finished, a data comparison between received and pattern will be executed, and the result will be prompted.
+    - Note the pattern file selection will be remain until you change it, so you don't need to select it each time you prepare to receive a raw file.
+    - Example of comparing the received raw data file with a built-in pattern file.
+    ```
+    [BLE UART]# pt 4
+    pattern file selection: ./pattern/100k.txt
+    [BLE UART]# rxf 0
+    set work mode = raw mode
+    waiting for data sending from remote peer.
+
+    Raw Data Rx finished
+    <Text Mode> Received(100008 bytes) from[34:81:F4:AE:0E:B1].
+    Raw data compare [100K] successfully.
+    [BLE UART]# 
+    ```
+ - sw \<1-3\>
+    - Transmission mode switch (1=checksum, 2=loopback, 3=fixed-pattern)
+    - There are three demo modes in Burst mode switch. These demo modes are used for data transmission verification and demonstration.
+    - After the transmission is finished, a data comparison between received and pattern will be executed, and the result will be prompted.
+        - Checksum Mode: Uni-direction (Central to Peripheral)
+            - Central sends a multiple-bytes-data to Peripheral, and the Peripheral will execute checksum calculation and response with the checksum to Central.
+            - Purpose: Demonstrate the downlink (Central to Peripheral) throughput.
+        - Fixed-Pattern Mode:  Uni-direction (Peripheral to Central)
+            - Peripheral sends a fixed-data-pattern in a incremental counter to Central.
+            - The sending data size is 500 kBytes.
+            - Purpose: Demonstrate the uplink (Chimera to mobile app) throughput. 
+        - Loopback Mode: Bi-direction (between Central and Peripheral)
+            - Central sends a selected pattern file to Peripherals. And the Peripheral return the data back.
+            - Note that pattern file should be selected by using of 'pt' command (see following command for details) prior to executing the 'sw' command.
+            - Purpose: Demonstrate the bi-direction throughput. 
+        ```
+        [BLE UART]# sw 1
+        set work mode = Checksum mode        
+        [BLE UART]# sw 2
+        set work mode = Loopback mode
+        [BLE UART]# sw 3
+        set work mode = Fixed-pattern mode
+        [BLE UART]# 
+        ```
+ - pt \<0-6\>
+    - Select data pattern for transmission(0=1K, 1=5K, 2=10K, 3=50K, 4=100K, 5=200L, 6=500K)
+    - Note that only loopback mode needs to select data pattern.
+    > Pattern folder should be copied from tools/pattern to where the executable application binary located.
+    ```
+    [BLE UART]# pt 4
+    pattern file selection: ./pattern/100k.txt
+    [BLE UART]# pt 6
+    pattern file selection: ./pattern/500k.txt
+    [BLE UART]# 
+    ```
+ - b \<index\>
+    - Start Burst Mode data transmission in selected transmission mode on selected device.
+    - Use this command after Transmission mode switch.
+    - The transmission result and time elapsed will be printed.
+    > Note that, in order to have a better user experience regarding the pogress status update, please change terminal newline check to only "LF" (Line Feed).
+    - Example of Checksum Mode
+        ```
+        [BLE UART]# sw 1
+        set work mode = Checksum mode
+        [BLE UART]# b 0
+        Checksum start
+        Progressing: [RNBD451_0EB1: 100%]
+        Test result(0 runs):
+        [Index]	[     Address     ][    Name    ][Result][Time Elapsed]
+        =================================================================================
+        dev# 0	[34:81:F4:AE:0E:B1][RNBD451_0EB1][Passed][9.760171 s]
+
+        [BLE UART]# 
+        ```      
+ - ba
+    - Start Burst Mode data transmission in selected transmission mode on all connected devices.
+    - Use this command after Transmission mode switch.
+    - The transmission result for all joined device and the time elapsed for each device will be printed.
+    > Note that, in order to have a better user experience regarding the pogress status update, please change terminal newline check to only "LF" (Line Feed).
+    - Example of loopback Mode
+        ```
+        [BLE UART]# sw 2
+        set work mode = Loopback mode
+        [BLE UART]# pt 6
+        pattern file selection: ./pattern/500k.txt
+        [BLE UART]# ba
+        Loopback start
+        loopback start for all
+        Progressing: [RNBD451_0EC0: 100%][RNBD451_0EB1: 100%]
+        Loopback (500K) test result(0 runs):
+        [Index]	[     Address     ][    Name    ][Result][Time Elapsed]
+        =================================================================================
+        dev# 0	[34:81:F4:AE:0E:C0][RNBD451_0EC0][Passed][28.086804 s]
+        dev# 1	[34:81:F4:AE:0E:B1][RNBD451_0EB1][Passed][28.824292 s]
+
+        [BLE UART]# 
+        ```
+ - io \<0-4\>
+    - IO capability setting (0=DispalyOnly, 1=DisplayYesNo, 2=KeyboardOnly, 3=NoInputNoOutput, 4=KeyboardDisplay)
+    ```
+    [BLE UART]# io 4
+    Agent unregistered
+    Agent registered (IO Capability=KeyboardDisplay)
+    [BLE UART]# 
+    ```
+ - sc \<0-1\>
+    - Secure connection setting (0=disable, 1=enable)
+    ```
+    [BLE UART]# sc 1
+    Secure Connection mode setup complete
+    ```
+ - pinfo
+    - Print current IO capability and secure connection setting
+    ```
+    [BLE UART]# sc 1
+    Secure Connection mode setup complete
+    [BLE UART]# pinfo
+    IO Capability = NoInputNoOutput
+    secure connection = enabled
+    [BLE UART]# 
+    ```
+
+ - version
+    - Show ble-uart-bluez version (host application)
+
+## 7. Reference
+
+ - GLib Reference Manual
+https://developer-old.gnome.org/glib/unstable/
+ - GNU Readline Library
+http://www.gnu.org/software/readline/
+ - BlueZ
+https://www.bluez.org/
+
+## 8. Note for Debugging
+When performing a test case, please add following special steps. These steps will adjust system time and generate a useful HCI log to assist with debugging if needed.
+1. Configure date information in system. Please configure system time whenever you power on the SAMA7 EVK.
+    ```
+    date -s "2024/4/11 16:36:00"
+    ```
+2. The "exec-ble-uart-bluez.sh" script can be found in /tools in this repo and it replace step 5.4.6 and step 5.4.7 describe aboved. Execute "exec-ble-uart-bluez.sh". Followed the script name by baud rate, if baud rate is not specified, it would be set to 115200 automatically.
+    ```
+    #mount /dev/sda1 /mnt
+    #cd /mnt
+    #./exec-ble-uart-bluez.sh 115200
+    ```
+
+## 9. Verification
+### 9.1 DUT as Central Role Testing (Text mode)
+1. Prepare a RNBD451 for a peripheral role. Use Docklight and open correct COM port as an User interface tool.  
+2. After powering SAMA7 on, enter "root" to login as root.  
+	```
+    Poky (Yocto Project Reference Distro) 4.0.9 sama7g5ek-sd ttyS0
+    sama7g5ek-sd login: root
+    root@sama7g5ek-sd:~#
+    ```
+3. Mount the USB Flash Drive.  
+	```
+    root@sama7g5ek-sd:~# mount /dev/sda1 /mnt
+    FAT-fs (sda): Volume was not properly unmounted. Some data may be corrupt. Please run fsck.
+    root@sama7g5ek-sd:~#
+    root@sama7g5ek-sd:~# cd /mnt
+    root@sama7g5ek-sd:/mnt#
+    root@sama7g5ek-sd:/mnt#
+    ```
+4. Copy BlueZ configuration file "main.conf" (Please copy main.conf to USB Flash Drive from tools folder in this repo). <br>
+	```
+    root@sama7g5ek-sd:/mnt# cp main.conf /etc/bluetooth
+    root@sama7g5ek-sd:/mnt#
+    ```
+5. Check if the main.conf file exists in /etc/bluetooth  
+    ```
+    root@sama7g5ek-sd:/mnt# ls -l /etc/bluetooth/
+    total 12
+    -rw-r--r-- 1 root root 927 Mar  9 12:34 input.conf
+    -rw-r--r-- 1 root root 325 Mar  9 12:38 main.conf
+    -rw-r--r-- 1 root root 120 Mar  9 12:34 network.conf
+    root@sama7g5ek-sd:/mnt#
+    root@sama7g5ek-sd:/mnt#
+    ```
+6. Configure baud rate for ttyS1
+	- #stty -F /dev/ttyS1 115200  
+		- You will see following messages shown, it is as expected.  
+		- atmel_usart_serial atmel_usart_serial.1.auto: using dma1chan2 for rx DMA transfers  
+		- atmel_usart_serial atmel_usart_serial.1.auto: using dma1chan3 for tx DMA transfers  
+		```
+        root@sama7g5ek-sd:/mnt# stty -F /dev/ttyS1 115200
+        atmel_usart_serial atmel_usart_serial.1.auto: using dma1chan2 for rx DMA transfers
+        atmel_usart_serial atmel_usart_serial.1.auto: using dma1chan3 for tx DMA transfers
+        root@sama7g5ek-sd:/mnt#
+        root@sama7g5ek-sd:/mnt#
+        ```
+7. Attach HCI device into SAMA7  
+	- #hciattach /dev/ttyS1 any 115200 noflow  
+		- Once the following messages are shown below, the hciattach is successful.  
+		```
+        root@sama7g5ek-sd:/mnt# hciattach /dev/ttyS1 any 115200 noflow
+        atmel_usart_serial atmel_usart_serial.1.auto: using dma1chan2 for rx DMA transfers
+        atmel_usart_serial atmel_usart_serial.1.auto: using dma1chan3 for tx DMA transfers
+        Device setup complete
+        root@sama7g5ek-sd:/mnt#
+        root@sama7g5ek-sd:/mnt# Bluetooth: MGMT ver 1.22
+        NET: Registered PF_ALG protocol family
+
+        root@sama7g5ek-sd:/mnt#
+        root@sama7g5ek-sd:/mnt#
+        ```
+8. Execute ble-uart-bluez application  
+	- #./ble-uart-bluez
+	- input "version" in ble-uart-bluez command line to check application version  
+		```
+        Agent registered
+        [BLE UART]#
+
+        Selected phys: LE1MTX LE1MRX LE2MTX LE2MRX
+        [BLE UART]# version
+        Version 0.9.0.3
+        [BLE UART]#
+        ```
+9. On the SAMA7, execute scan command to obtain the nearby advertising.  
+	- input "scan" in ble-uart-bluez command line  
+		```
+        [BLE UART]# scan
+        [BLE UART]#
+
+        Discovery started
+        [BLE UART]# found device[4C:99:B6:D3:62:4A][random]
+        found device[28:11:A5:23:B3:B6][public]
+        found device[33:FA:C4:E1:A9:40][random]
+        found device[53:CA:DD:63:82:C2][random]
+        found device[34:81:F4:AE:0E:C0][public]
+        found device[3A:6E:E7:00:5A:59][random]
+        found device[66:73:68:29:F4:D9][random]
+        found device[60:BC:EA:97:82:4F][random]
+        ...
+
+        Discovery stopped
+        [BLE UART]#
+        Total devices = 74, only list devices which RSSI > -70
+        Device List:
+        [Index] [  Connected:? ][     Address     ][RSSI][Name]
+        =================================================================================
+        dev# 0  [connected:0(N)][28:E1:4C:D8:54:5C][   0][D300 iPhone 5s]
+        dev# 1  [connected:0(N)][34:81:F4:AE:0E:AC][ -33][RNBD451_0EAC]
+        dev# 2  [connected:0(N)][53:CA:DD:63:82:C2][ -56]
+        dev# 3  [connected:0(N)][72:61:EC:56:60:19][ -57]
+        dev# 4  [connected:0(N)][3A:6E:E7:00:5A:59][ -59]
+        dev# 5  [connected:0(N)][54:46:ED:3F:17:83][ -59]
+        dev# 6  [connected:0(N)][6F:FE:0E:53:11:93][ -60]
+        ```
+10. Find the index 1 for the device name of RNBD451_XXXX, and then create a connection with it.  
+	- Find the device name RNBD451_XXXX to create the connection. For the example here, input "conn 1" in ble-uart-bluez command line to create connection, following is a successful case.
+		```
+        [BLE UART]# conn 1
+        connecting to device[34:81:F4:AE:0E:AC]
+        [BLE UART]#
+
+        device [34:81:F4:AE:0E:AC] connected
+        [BLE UART]#
+
+        TRP down link is established
+        [BLE UART]#
+
+        TRP up link is established
+        [BLE UART]#
+        ```
+	- In peripheral side(RNBD451). Confirm transparent service is successfully established as well.  
+		![central-connected](assets/central-connected.png)  
+11. On the SAMA7 side, text can be sent to the RNBD451 using a raw command, and vice versa.  
+	- Check the connection index  
+		- input "dev" in ble-uart-bluez command line  
+			```
+            [BLE UART]# dev
+
+            Total devices = 2, only list devices which RSSI > -70
+            Device List:
+            [Index] [  Connected:? ][     Address     ][RSSI][Name]
+            =================================================================================
+            dev# 0  [connected:0(N)][28:E1:4C:D8:54:5C][   0][D300 iPhone 5s]
+            dev# 1  [connected:1(C)][34:81:F4:AE:0E:AC][   0][RNBD451_0EAC]
+            ```
+	- Send a text to RNBD451 from SAMA7 side by raw command  
+		- input "raw 1 4C6F7665204D6963726F63686970" in ble-uart-bluez command line  
+			```
+            [BLE UART]# raw 1 4C6F7665204D6963726F63686970
+            <Text Mode> Sent(28 bytes) to peer[34:81:F4:AE:0E:AC] successed
+            [BLE UART]#
+            [BLE UART]#
+            ```
+		- Confirm RNBD451 has received the text  
+		![37](assets/central-received.png)  
+	- Send a text from RNBD451 to the SAMA7 by docklight   
+	![38](assets/central-send.png)  
+    - Confirm ble-uart-bluez on SAMA7 has received the text  
+		```
+        [BLE UART]#
+        <Text Mode> Received(17 bytes) from[34:81:F4:AE:0E:AC]:12345678910111213
+        [BLE UART]#
+        ```
+### 9.2 DUT as Peripheral Role Testing (Text mode)
+1. On the SAMA7, executing the ble-uart-bluez application as same steps from 9.1.2 to 9.1.8.  
+2. Start advertising and make connect from mobile app MBD.  
+    > Note: If you use Android MBD, please make sure the MBD App version is v6.7.3 or later.
+	- input "adv 1" in ble-uart-bluez command line  
+    ```
+    [BLE UART]# adv 1
+    advertising name=BLUEZ_D573
+    advertising is on
+    [BLE UART]#
+    [BLE UART]#
+    ```
+	- In the mobile app MBD, you can see the device name "BLUEZ_XXXX" in the scan list and touch it to connect with it.  
+		- As shown in the figure below, the connection with MBD is success.  
+        ```
+        [BLE UART]# found device[76:8F:B0:30:5B:69][random]
+
+        advertising is off
+        [BLE UART]#
+
+        device [76:8F:B0:30:5B:69] connected
+        [BLE UART]#
+        Text Mode enabled
+        [BLE UART]#
+        TRP link is established
+        [BLE UART]#
+        Request authorization
+        [BLE UART]#
+        auto-accept pairing (IO Capability=NoInputNoOutput)
+        [BLE UART]#
+        Text Mode enabled
+        [BLE UART]#
+        TRP link is established
+        [BLE UART]#
+        ```
+3. In the MBD, change mode to Text mode and then send the text to the remote peer.  
+	![42](assets/Peripheral_3.png)  
+	-  In the SAMA7, confirm the text received.  
+        ```
+        <Text Mode> Received(14 bytes) from[50:B1:27:79:E8:46]:Love Microchip
+        [BLE UART]#
+        ```
+	- Send a text from SAMA7 to mobile app  
+		- Check the connection list in the SAMA7  
+		- input "dev" in ble-uart-bluez command line  
+            ```
+            [BLE UART]# dev
+
+            Total devices = 2, only list devices which RSSI > -70
+            Device List:
+            [Index] [  Connected:? ][     Address     ][RSSI][Name]
+            =================================================================================
+            dev# 0  [connected:0(N)][34:81:F4:AE:0E:C0][   0][RNBD451_0EC0]
+            dev# 1  [connected:1(P)][50:B1:27:79:E8:46][   0][iPhone]
+            ```
+		- input "raw 1 123456" in ble-uart-bluez command line  
+			```
+            [BLE UART]# raw 1 123456
+            <Text Mode> Notify(6 bytes) to all clients successed
+            [BLE UART]#
+            [BLE UART]#
+            ```
+		- Check if "123456" is shown in the MBD.  
+		![46](assets/Peripheral_7.png)  

@@ -1,0 +1,9 @@
+# BlueZ BLE Apps
+
+## Introduction
+This repo contains source files, cmake configuration files to build bluez hci ble apps `ble-uart-bluez` and `dfu-bluez`.
+
+ - **profiles**  
+    BLE GATT profiles based on BlueZ.
+ - **services**  
+    BLE GATT services based on BlueZ.
