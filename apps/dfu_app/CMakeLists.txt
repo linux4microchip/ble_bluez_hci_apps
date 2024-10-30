@@ -26,4 +26,4 @@ SET (CMAKE_VERBOSE_MAKEFILE TRUE)
 
 target_sources (dfu-bluez PRIVATE ${APP_SRCS})
 target_include_directories(dfu-bluez PUBLIC ${APP_DIR})
-target_link_libraries(dfu-bluez PUBLIC glib-2.0 dbus-1 readline shared-glib bluetooth)
+target_link_libraries(dfu-bluez PUBLIC glib-2.0 dbus-1 shared-glib bluetooth readline)
